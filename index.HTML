@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Clicker</title>
+
+<style>
+body{
+    margin:0;
+    background:#0f1115;
+    font-family:Arial;
+    color:white;
+}
+
+.top{
+    position:fixed;
+    top:0;
+    width:100%;
+    background:#151922;
+    padding:15px;
+    text-align:center;
+    font-weight:bold;
+}
+
+.screen{
+    display:none;
+    padding-top:80px;
+    padding-bottom:100px;
+}
+.active{display:block}
+
+.farmBtn{
+    margin-top:120px;
+    width:180px;
+    height:180px;
+    border-radius:50%;
+    background:#2b313a;
+    border:none;
+    font-size:22px;
+    color:white;
+    box-shadow:0 0 25px #000;
+    transition:0.1s;
+}
+.farmBtn:active{
+    transform:scale(0.95);
+}
+
+.caseCard{
+    margin:20px;
+    padding:20px;
+    border-radius:16px;
+    background:linear-gradient(145deg,#1d2128,#111318);
+}
+
+.rouletteWrap{
+    width:100%;
+    overflow:hidden;
+    margin-top:20px;
+}
+.roulette{
+    display:flex;
+    transition:transform 3s cubic-bezier(.1,.7,.1,1);
+}
+.item{
+    min-width:80px;
+    padding:20px 10px;
+    text-align:center;
+}
+.winner{
+    color:#00ff99;
+    font-weight:bold;
+}
+
+.invItem{
+    background:#1b2028;
+    margin:15px;
+    padding:15px;
+    border-radius:12px;
+}
+
+.bottom{
+    position:fixed;
+    bottom:0;
+    width:100%;
+    background:#151922;
+    display:flex;
+    justify-content:space-around;
+    padding:15px 0;
+}
+.bottom div{
+    opacity:0.6;
+}
+.bottom .activeTab{
+    opacity:1;
+}
+</style>
+</head>
+
+<body>
+
+<div class="top">
+Баланс: <span id="balance">0.00</span> ⭐
+</div>
+
+<div id="game" class="screen active" style="text-align:center">
+<button class="farmBtn" onclick="farm()">+0.05</button>
+</div>
+
+<div id="cases" class="screen">
+
+<div class="caseCard">
+<h3>🎰 Бесплатный</h3>
+<button onclick="openCase('free')">Открыть</button>
+<div id="freeCooldown"></div>
+</div>
+
+<div class="caseCard">
+<h3>💎 Silver (50⭐)</h3>
+<button onclick="openCase('silver')">Открыть</button>
+</div>
+
+<div class="caseCard">
+<h3>👑 Gold (100⭐)</h3>
+<button onclick="openCase('gold')">Открыть</button>
+</div>
+
+<div class="rouletteWrap">
+<div id="roulette" class="roulette"></div>
+</div>
+
+</div>
+
+<div id="inventory" class="screen">
+<h2 style="text-align:center">🎁 Инвентарь</h2>
+<div id="invList"></div>
+</div>
+
+<div class="bottom">
+<div onclick="switchTab('game')" id="tab_game" class="activeTab">Игра</div>
+<div onclick="switchTab('cases')" id="tab_cases">Кейсы</div>
+<div onclick="switchTab('inventory')" id="tab_inventory">Инвентарь</div>
+</div>
+
+<script>
+let balance = 0;
+let inventory = [];
+let clickCooldown = false;
+let caseOpening = false;
+
+let lastFree = 0;
+const freeCooldown = 600000; // 10 минут
+
+function save(){
+localStorage.setItem("balance",balance);
+localStorage.setItem("inventory",JSON.stringify(inventory));
+localStorage.setItem("lastFree",lastFree);
+}
+
+function load(){
+balance = parseFloat(localStorage.getItem("balance")) || 0;
+inventory = JSON.parse(localStorage.getItem("inventory")) || [];
+lastFree = parseInt(localStorage.getItem("lastFree")) || 0;
+updateUI();
+}
+
+function updateUI(){
+document.getElementById("balance").innerText = balance.toFixed(2);
+let inv = document.getElementById("invList");
+inv.innerHTML="";
+inventory.forEach(i=>{
+inv.innerHTML+=`<div class="invItem">${i}</div>`;
+});
+}
+
+function switchTab(id){
+document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+document.querySelectorAll(".bottom div").forEach(b=>b.classList.remove("activeTab"));
+document.getElementById("tab_"+id).classList.add("activeTab");
+}
+
+function farm(){
+if(clickCooldown) return;
+clickCooldown=true;
+
+balance+=0.05;
+updateUI();
+save();
+
+setTimeout(()=>clickCooldown=false,500);
+}
+
+function roll(chances){
+let rand=Math.random()*100;
+let sum=0;
+for(let c of chances){
+sum+=c.chance;
+if(rand<=sum) return c.reward;
+}
+}
+
+function openCase(type){
+if(caseOpening) return;
+caseOpening=true;
+
+if(type==="free"){
+if(Date.now()-lastFree < freeCooldown){
+caseOpening=false;
+return;
+}
+lastFree=Date.now();
+}
+
+if(type==="silver"){
+if(balance<50){caseOpening=false;return;}
+balance-=50;
+}
+
+if(type==="gold"){
+if(balance<100){caseOpening=false;return;}
+balance-=100;
+}
+
+let reward;
+
+if(type==="free"){
+reward=roll([
+{reward:5,chance:50},
+{reward:10,chance:25},
+{reward:25,chance:5},
+{reward:50,chance:2.5},
+{reward:"🎂 Торт",chance:2.5},
+{reward:0,chance:15}
+]);
+}
+
+if(type==="silver"){
+reward=roll([
+{reward:10,chance:40},
+{reward:25,chance:30},
+{reward:50,chance:15},
+{reward:100,chance:10},
+{reward:"🎂 Торт",chance:5}
+]);
+}
+
+if(type==="gold"){
+reward=roll([
+{reward:25,chance:35},
+{reward:50,chance:30},
+{reward:100,chance:20},
+{reward:200,chance:10},
+{reward:"🎂 Торт",chance:5}
+]);
+}
+
+animateRoulette(reward);
+}
+
+function animateRoulette(finalReward){
+let roulette=document.getElementById("roulette");
+roulette.innerHTML="";
+roulette.style.transform="translateX(0)";
+
+let items=["5⭐","10⭐","25⭐","50⭐","🎂 Торт","0"];
+for(let i=0;i<40;i++){
+let div=document.createElement("div");
+div.className="item";
+div.innerText=items[Math.floor(Math.random()*items.length)];
+roulette.appendChild(div);
+}
+
+let stopIndex=30;
+roulette.children[stopIndex].innerText=
+typeof finalReward==="number"?finalReward+"⭐":finalReward;
+
+setTimeout(()=>{
+roulette.style.transform=`translateX(-${stopIndex*80}px)`;
+},50);
+
+setTimeout(()=>{
+if(typeof finalReward==="number"){
+balance+=finalReward;
+}else{
+inventory.push(finalReward);
+}
+updateUI();
+save();
+roulette.children[stopIndex].classList.add("winner");
+caseOpening=false;
+},3000);
+}
+
+function updateCooldown(){
+let cd=document.getElementById("freeCooldown");
+let diff=freeCooldown-(Date.now()-lastFree);
+if(diff<=0){
+cd.innerText="Доступен";
+}else{
+let m=Math.floor(diff/60000);
+let s=Math.floor((diff%60000)/1000);
+cd.innerText="Через "+m+"м "+s+"с";
+}
+}
+
+setInterval(updateCooldown,1000);
+load();
+</script>
+
+</body>
+</html>
